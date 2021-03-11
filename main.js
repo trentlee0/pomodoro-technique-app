@@ -15,7 +15,6 @@ function createWindow() {
     });
 
     win.loadFile('index.html')
-    win.webContents.openDevTools();
 
     Menu.setApplicationMenu(null);
 
@@ -75,6 +74,10 @@ app.whenReady().then(() => {
             label: '隐藏窗口',
             accelerator: 'Ctrl+Shift+P',
             click: () => win.hide()
+        },
+        {
+            label: '开发者模式',
+            click: () => win.webContents.openDevTools()
         },
         {
             label: '工作',
