@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, Menu, Tray } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu, Tray, globalShortcut } = require('electron');
 const path = require('path');
 
 let win;
@@ -15,7 +15,7 @@ function createWindow() {
     });
 
     win.loadFile('index.html')
-    // win.webContents.openDevTools();
+    win.webContents.openDevTools();
 
     Menu.setApplicationMenu(null);
 
@@ -39,13 +39,11 @@ function createWindow() {
 
 process.env['ELECTRON_DISABLE_SECURITY_WARNINGS'] = 'true';
 
-app.whenReady().then(createWindow);
-
 if (!app.requestSingleInstanceLock()) {
     app.quit()
 } else {
     app.on('second-instance', (event, commandLine, workingDirectory) => {
-        // 当运行第二个实例时,将会聚焦到mainWindow这个窗口
+        // 当运行第二个实例时,将会聚焦到win这个窗口
         if (win) {
             if (win.isMinimized()) win.restore();
             win.focus();
@@ -54,6 +52,15 @@ if (!app.requestSingleInstanceLock()) {
     });
 }
 
+app.whenReady().then(() => {
+    //全局快捷键
+    globalShortcut.register('CommandOrControl+Shift+P', () => {
+        win.isVisible() ? win.hide() : win.show();
+    });
+}).then(createWindow);
+
+
+
 //系统托盘
 let tray = null;
 app.whenReady().then(() => {
@@ -61,10 +68,12 @@ app.whenReady().then(() => {
     const trayMenu = Menu.buildFromTemplate([
         {
             label: '显示窗口',
+            accelerator: 'Ctrl+Shift+P',
             click: () => win.show()
         },
         {
             label: '隐藏窗口',
+            accelerator: 'Ctrl+Shift+P',
             click: () => win.hide()
         },
         {
@@ -131,7 +140,8 @@ ipcMain.on('synchronous-message', (event, arg) => {
     }
 });
 
-ipcMain.on('alway-show-window', (arg) => {
+ipcMain.on('alway-show-window', (event, arg) => {
+    console.log(arg);
     let rest = parseInt(arg);
     win.setAlwaysOnTop(true);
     win.setMovable(false);
