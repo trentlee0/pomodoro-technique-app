@@ -56,7 +56,7 @@ class Countdown {
         this.totalSecond = totalSecond;
         this.currentSecond = 0;
         this.isPause = false;
-        let i = 0;
+        this.i = 0;
         this.timer = setInterval(() => {
             if (this.currentSecond + 1 == this.totalSecond) {
                 this.clear();
@@ -64,9 +64,11 @@ class Countdown {
             this.currentSecond++;
             if (this.ontick) {
                 this.ontick();
-                i++;
             }
-            if (i == 0 && this.onstart()) this.onstart();
+            if (this.i == 0 && this.onstart) {
+                this.onstart();
+                this.i++;
+            }
             if (this.getRemainingSecond() == 0) {
                 this.clear();
                 if (this.onend) this.onend();
@@ -272,15 +274,13 @@ function run(feature) {
 
     /***********以下事件会在前台或后台运行***********/
 
-    let i = 0;
     cd.ontick = () => {
         $(timerDivSelector).innerHTML = cd.getShowString();
+    };
+
+    cd.onstart = () => {
         if (feature.code == 'rest') {
-            if (i == 0) {
-                ipcRenderer.send('show-main-message', restTime);
-                i++;
-            }
-            $(homeBtnSelector).onclick = () => false;
+            ipcRenderer.send('show-main-message', restTime);
         }
     };
 

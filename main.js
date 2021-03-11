@@ -15,7 +15,7 @@ function createWindow() {
     });
 
     win.loadFile('index.html')
-    // win.webContents.openDevTools();
+    win.webContents.openDevTools();
 
     Menu.setApplicationMenu(null);
 
@@ -96,7 +96,7 @@ app.whenReady().then(() => {
 
 ipcMain.on('synchronous-message', (event, arg) => {
     if (arg == 'quit-timer') {
-        let index = dialog.showMessageBoxSync({
+        let index = dialog.showMessageBoxSync(win, {
             type: 'question',
             buttons: ['确定', '取消'],
             title: '提示',
@@ -112,7 +112,7 @@ ipcMain.on('synchronous-message', (event, arg) => {
         }
     } else if (arg == 'rest') {
         setTimeout(() => {
-            let index = dialog.showMessageBoxSync({
+            let index = dialog.showMessageBoxSync(win, {
                 type: 'question',
                 buttons: ['取消', '休息一下'],
                 title: '提示',
@@ -131,7 +131,6 @@ ipcMain.on('synchronous-message', (event, arg) => {
 });
 
 ipcMain.on('show-main-message', (event, arg) => {
-    console.log(arg);
     let rest = parseInt(arg);
     win.setAlwaysOnTop(true);
     win.setMovable(false);
