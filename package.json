@@ -33,6 +33,7 @@
   },
   "dependencies": {
     "jquery": "^3.6.0",
+    "lowdb": "^1.0.0",
     "timer.js": "^1.0.4"
   }
 }

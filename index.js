@@ -2,13 +2,12 @@ const {ipcRenderer} = require('electron');
 const Timer = require('timer.js');
 window.$ = window.jQuery = require('jquery');
 
-/** 通过秒数，获取时钟，小时分钟秒，如果小时为0就不返回小时 */
-function getClockTime(second) {
-    let ss = Math.floor(second % 60);
-    let mm = Math.floor(second / 60);
-    let hh = Math.floor(second / 3600);
-    return ((hh === 0) ? "" : hh.toString().padStart(2, '0') + ":") + mm.toString().padStart(2, '0') + ":" + ss.toString().padStart(2, '0');
-}
+const path = require('path');
+
+const lowdb = require('lowdb');
+const FileSync = require('lowdb/adapters/FileSync');
+const adapter = new FileSync(path.join(__dirname, 'settings.json'));
+const db = lowdb(adapter);
 
 /** 第一个界面 */
 const firstFrameSelector = ".first";
@@ -50,11 +49,7 @@ let workTime = 10;
 /** 休息时间，单位：秒 */
 let restTime = 5;
 /** 背景颜色 */
-let background;
-/** 通知图标 */
-let logoIcon = './img/logo.png';
-/** 通知标题 */
-let appName = '番茄时钟';
+let background = '#87CEAA';
 
 let timer = null;
 /** 是否已经开始任务 */
@@ -82,9 +77,9 @@ function startTimer(second) {
 
 function run(type) {
     timer = new Timer({
-        onstart: () => start(type),
+        onstart: () => timerStart(type),
         ontick: (ms) => $(timerDivSelector).html(getClockTime(Math.round(ms / 1000))),
-        onend: () => end(type)
+        onend: () => timerEnd(type)
     });
 
     if (!isClocking) {
@@ -104,7 +99,7 @@ function run(type) {
 /**
  * 开始计时调用执行
  */
-function start(type) {
+function timerStart(type) {
     $(taskBtnSelector).css("display", 'none');
     $(pauseBtnSelector).css("display", 'block');
     $(pauseBtnSelector).html('暂停');
@@ -124,7 +119,7 @@ function start(type) {
 /**
  * 计时结束调用执行
  */
-function end(type) {
+function timerEnd(type) {
     $(pauseBtnSelector).css("display", 'none');
     $(taskBtnSelector).css("display", 'block');
     $(titleDivSelector).html('');
@@ -141,7 +136,10 @@ function end(type) {
 }
 
 function main() {
-    $(settingBtnSelector).click(() => $(settingFrameSelector).fadeToggle("fast"));
+    $(settingBtnSelector).click((event) => {
+        $(settingFrameSelector).fadeToggle("fast");
+        event.stopPropagation();
+    });
 
     $(settingBtnSelector).mousedown(() => false);
 
@@ -149,8 +147,8 @@ function main() {
 
     $(saveBtnSelector).click(() => {
         updateData({
-            workHours: $(workInputSelector).val(),
-            restHours: $(restInputSelector).val(),
+            workHours: parseInt($(workInputSelector).val()),
+            restHours: parseInt($(restInputSelector).val()),
             backgroundColor: $(colorInputSelector).val()
         });
         $(settingBtnSelector).click();
@@ -183,6 +181,14 @@ function main() {
         }
     });
 
+    $(document).on('click', () => {
+        $(settingFrameSelector).fadeOut();
+    });
+
+    $(settingFrameSelector).on('click', (event) => {
+        event.stopPropagation();
+    });
+
     $(pauseBtnSelector).click(() => {
         if (timer != null) {
             if (isPause) {
@@ -206,64 +212,61 @@ function main() {
         } else if ($(taskBtnSelector).text().trim() === '休息') {
             run('rest');
         }
+        $(settingFrameSelector).fadeOut('fast');
     });
+}
+
+/**
+ *  通过秒数，获取时钟，小时分钟秒，如果小时为0就不返回小时
+ */
+function getClockTime(second) {
+    let ss = Math.floor(second % 60);
+    let mm = Math.floor(second / 60);
+    let hh = Math.floor(second / 3600);
+    return ((hh === 0) ? "" : hh.toString().padStart(2, '0') + ":") + mm.toString().padStart(2, '0') + ":" + ss.toString().padStart(2, '0');
 }
 
 /**
  * 初始化数据
  */
 function initData() {
-    let storage = window.localStorage;
+    workTime = db.get('work').value();
+    restTime = db.get('rest').value();
+    background = db.get('background').value();
 
-    let workHours = storage.getItem('work');
-    let restHours = storage.getItem('rest');
-    let backgroundColor = storage.getItem('background');
-
-    if (workHours == null && restHours == null && backgroundColor == null) {
-        updateData({workHours: 10, restHours: 5, backgroundColor: '#87CEEB'});
-        return;
-    }
-
-    if (workHours == null) updateData({workHours: 10});
-    else workTime = workHours;
-
-    if (restHours == null) updateData({restHours: 5});
-    else restTime = restHours;
-
-    if (backgroundColor == null) updateData({backgroundColor: '#87CEEB'});
-    else background = backgroundColor;
-
-    $('html').css("background-color", background);
-    $(colorShowSelector).css("background-color", background);
-    $(colorInputSelector).val(background);
-
-    $(workInputSelector).val(workTime);
-    $(restInputSelector).val(restTime);
+    updateViewData();
 }
 
 /**
  * 更新数据
  */
 function updateData({workHours, restHours, backgroundColor}) {
-    let storage = window.localStorage;
-
     if (workHours != null) {
-        storage.setItem('work', workHours.toString());
-        $(workInputSelector).val(workTime);
+        db.set('work', workHours).write();
         workTime = workHours;
     }
 
     if (restHours != null) {
-        storage.setItem('rest', restHours.toString());
-        $(restInputSelector).val(restTime);
+        db.set('rest', restHours).write();
         restTime = restHours;
     }
 
     if (backgroundColor != null) {
-        storage.setItem('background', backgroundColor);
-        $('html').css("background-color", backgroundColor);
-        $(colorShowSelector).css("background-color", backgroundColor);
-        $(colorInputSelector).val(backgroundColor);
+        db.set('background', backgroundColor).write();
         background = backgroundColor;
     }
+
+    updateViewData();
+}
+
+/**
+ * 更新视图数据
+ */
+function updateViewData() {
+    $('html').css("background-color", background);
+    $(colorShowSelector).css("background-color", background);
+    $(colorInputSelector).val(background);
+
+    $(workInputSelector).val(workTime);
+    $(restInputSelector).val(restTime);
 }
