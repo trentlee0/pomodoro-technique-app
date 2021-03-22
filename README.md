@@ -4,7 +4,7 @@
 #### 构建
 1. 安装依赖 `npm install`
 2. 打包（二选一）
-    1. [Electron Packager](https://github.com/electron/electron-packager) 打包
+   1. [Electron Packager](https://github.com/electron/electron-packager) 打包
         ```
         npm run package
         ```
