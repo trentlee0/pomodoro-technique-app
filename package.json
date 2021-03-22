@@ -1,33 +1,46 @@
 {
-  "name": "pomodoro-technique-app",
+  "name": "tomato",
   "version": "0.0.1",
   "description": "番茄时钟",
   "main": "main.js",
   "author": "Trent0",
   "license": "ISC",
+  "scripts": {
+    "start": "electron .",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "package": "electron-packager . 番茄时钟 --win --out ./out --arch=x64 --overwrite --icon=./img/icon.ico"
+  },
   "build": {
     "appId": "com.trent.tomato",
-    "mac": {
-      "target": [
-        "dmg",
-        "zip"
-      ]
+    "asar": true,
+    "directories": {
+      "buildResources": "./",
+      "output": "dist"
     },
     "win": {
-      "icon": "./img/icon.ico",
+      "icon": "img/icon.ico",
+      "asarUnpack": [
+        "README.md"
+      ],
       "target": [
         "nsis",
         "zip"
       ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "img/icon.ico",
+      "uninstallerIcon": "img/icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Tomato"
     }
   },
   "postinstall": "electron-builder install-app-deps",
-  "scripts": {
-    "start": "electron .",
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dist": "electron-builder --win --x64",
-    "package": "electron-packager . 番茄时钟 --win --out ./out --arch=x64 --overwrite --icon=./img/icon.ico"
-  },
   "devDependencies": {
     "electron": "^12.0.0"
   },

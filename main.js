@@ -1,11 +1,16 @@
 const {app, globalShortcut, ipcMain, dialog, BrowserWindow, Menu, Tray, Notification} = require('electron');
-
 const path = require('path');
+
+const exeName = path.basename(process.execPath);
 
 const lowdb = require('lowdb');
 const FileSync = require('lowdb/adapters/FileSync');
-const adapter = new FileSync(path.join(__dirname, 'settings.json'));
+const adapter = new FileSync(path.join(process.cwd(), 'settings.json'));
 const db = lowdb(adapter);
+
+const icon = "img/icon.ico";
+const trayIcon = "img/icon_tray.ico";
+const trayWorkIcon = "img/icon_tray_work.ico";
 
 db.defaults({
     work: 10,
@@ -22,7 +27,7 @@ function createWindow() {
         width: 800,
         height: 600,
         //__dirname 总是指向被执行 js 文件的绝对路径
-        icon: path.join(__dirname, 'img/icon.ico'),
+        icon: path.join(__dirname, icon),
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false,
@@ -60,7 +65,11 @@ function createWindow() {
 function initSettings() {
     app.setLoginItemSettings({
         openAtLogin: db.read().get('boot').value(),
-        path: process.execPath
+        path: process.execPath,
+        args: [
+            '--processStart', `"${exeName}"`,
+            '--process-start-args', `"--hidden"`
+        ]
     });
 
     if (db.read().get('devToolsOpened').value()) {
@@ -93,7 +102,7 @@ app.whenReady().then(() => {
 //系统托盘
 let tray = null;
 app.whenReady().then(() => {
-    tray = new Tray(path.join(__dirname, 'img/icon_tray.ico'));
+    tray = new Tray(path.join(__dirname, trayIcon));
     const trayMenu = Menu.buildFromTemplate([
         {
             label: '显示/隐藏窗口',
@@ -120,11 +129,14 @@ app.whenReady().then(() => {
             label: '开机启动',
             checked: app.getLoginItemSettings().openAtLogin,
             click: function () {
-                let boot = db.read().get('boot').value();
-                boot = !boot;
+                let boot = !db.read().get('boot').value();
                 app.setLoginItemSettings({
                     openAtLogin: boot,
-                    path: process.execPath
+                    path: process.execPath,
+                    args: [
+                        '--processStart', `"${exeName}"`,
+                        '--process-start-args', `"--hidden"`
+                    ]
                 });
                 db.set('boot', boot).write();
                 console.log(app.getLoginItemSettings().openAtLogin);
@@ -170,7 +182,7 @@ ipcMain.on('synchronous-message', (event, arg) => {
         if (index === 0) {
             event.returnValue = 'yes';
 
-            tray.setImage(path.join(__dirname, "img/icon_tray.ico"));
+            tray.setImage(path.join(__dirname, trayIcon));
             tray.setToolTip("番茄时钟");
         } else {
             event.returnValue = 'no';
@@ -181,13 +193,13 @@ ipcMain.on('synchronous-message', (event, arg) => {
 ipcMain.on("work-to-rest", ((event, args) => {
     let msg = '已经工作一段时间了，休息一下吧！';
     let notification = new Notification({
-        icon: path.join(__dirname, 'img/icon.ico'),
+        icon: path.join(__dirname, icon),
         title: "番茄时钟",
         body: msg,
         timeoutType: "never"
     });
 
-    tray.setImage(path.join(__dirname, "img/icon_tray.ico"));
+    tray.setImage(path.join(__dirname, trayIcon));
     tray.setToolTip("番茄时钟");
 
     notification.show();
@@ -233,13 +245,13 @@ ipcMain.on('start-rest', (event, arg) => {
 ipcMain.on('start-work', (sys, msg) => {
     win.hide();
     let notification = new Notification({
-        icon: path.join(__dirname, 'img/icon.ico'),
+        icon: path.join(__dirname, icon),
         title: "番茄时钟",
         body: msg,
         silent: true
     });
 
-    tray.setImage(path.join(__dirname, "img/icon_tray_work.ico"));
+    tray.setImage(path.join(__dirname, trayWorkIcon));
     tray.setToolTip("Working...");
 
     notification.show();
@@ -250,7 +262,7 @@ ipcMain.on('start-work', (sys, msg) => {
 
 ipcMain.on("end-rest", (sys, msg) => {
     let notification = new Notification({
-        icon: path.join(__dirname, "img/icon.ico"),
+        icon: path.join(__dirname, icon),
         title: "番茄时钟",
         body: msg
     });

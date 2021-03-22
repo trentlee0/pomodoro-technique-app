@@ -6,7 +6,7 @@ const path = require('path');
 
 const lowdb = require('lowdb');
 const FileSync = require('lowdb/adapters/FileSync');
-const adapter = new FileSync(path.join(__dirname, 'settings.json'));
+const adapter = new FileSync(path.join(process.cwd(), 'settings.json'));
 const db = lowdb(adapter);
 
 /** 第一个界面 */
