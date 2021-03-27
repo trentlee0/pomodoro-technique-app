@@ -1,11 +1,16 @@
 const {app, globalShortcut, ipcMain, dialog, BrowserWindow, Menu, Tray, Notification} = require('electron');
+const fs = require('fs');
 const path = require('path');
 
 const exeName = path.basename(process.execPath);
 
 const lowdb = require('lowdb');
 const FileSync = require('lowdb/adapters/FileSync');
-const adapter = new FileSync(path.join(process.cwd(), 'settings.json'));
+const appDataPath = app.getPath("desktop");
+if (!fs.existsSync(appDataPath)) {
+    fs.mkdirSync(appDataPath);
+}
+const adapter = new FileSync(path.join(appDataPath, 'settings.json'));
 const db = lowdb(adapter);
 
 const icon = "img/icon.ico";
@@ -26,6 +31,7 @@ function createWindow() {
     win = new BrowserWindow({
         width: 800,
         height: 600,
+        show: false,
         //__dirname 总是指向被执行 js 文件的绝对路径
         icon: path.join(__dirname, icon),
         webPreferences: {
@@ -57,6 +63,13 @@ function createWindow() {
     win.on('hide', () => {
         win.setSkipTaskbar(true);
     });
+
+    win.once('ready-to-show', () => {
+        if (process.argv.indexOf("--openAsHidden") > 0)
+            win.hide();
+        else
+            win.show();
+    });
 }
 
 /**
@@ -67,8 +80,7 @@ function initSettings() {
         openAtLogin: db.read().get('boot').value(),
         path: process.execPath,
         args: [
-            '--processStart', `"${exeName}"`,
-            '--process-start-args', `"--hidden"`
+            "--openAsHidden"
         ]
     });
 
@@ -126,19 +138,17 @@ app.whenReady().then(() => {
         {
             type: 'checkbox',
             label: '开机启动',
-            checked: app.getLoginItemSettings().openAtLogin,
+            checked: db.read().get('boot').value(),
             click: function () {
                 let boot = !db.read().get('boot').value();
                 app.setLoginItemSettings({
                     openAtLogin: boot,
                     path: process.execPath,
                     args: [
-                        '--processStart', `"${exeName}"`,
-                        '--process-start-args', `"--hidden"`
+                        "--openAsHidden"
                     ]
                 });
                 db.set('boot', boot).write();
-                console.log(app.getLoginItemSettings().openAtLogin);
             }
         },
         {

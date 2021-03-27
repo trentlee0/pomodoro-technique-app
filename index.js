@@ -1,12 +1,18 @@
-const {ipcRenderer} = require('electron');
+const {ipcRenderer, remote} = require('electron');
+const fs = require('fs');
 const Timer = require('timer.js');
 window.$ = window.jQuery = require('jquery');
 
 const path = require('path');
 
+const appDataPath = remote.app.getPath('desktop');
+if (!fs.existsSync(appDataPath)) {
+    fs.mkdirSync(appDataPath);
+}
+
 const lowdb = require('lowdb');
 const FileSync = require('lowdb/adapters/FileSync');
-const adapter = new FileSync(path.join(process.cwd(), 'settings.json'));
+const adapter = new FileSync(path.join(appDataPath, 'settings.json'));
 const db = lowdb(adapter);
 
 /** 第一个界面 */
