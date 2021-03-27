@@ -19,7 +19,8 @@ db.defaults({
         background: "#87CEAA",
         showWindowShortcut: 'CmdOrCtrl+Shift+T',
         boot: false,
-        startWorkNotification: true
+        startWorkNotification: true,
+        startWorkHideWindow: true
     }
 }).write();
 
@@ -47,11 +48,8 @@ function createWindow() {
 
     win.loadFile('index.html');
 
-    Menu.setApplicationMenu(null);
     initSettings();
-
     createTray();
-
     handler();
 
     win.on('closed', (event) => {
@@ -83,6 +81,8 @@ function createWindow() {
  * 初始化设置
  */
 function initSettings() {
+    Menu.setApplicationMenu(null);
+
     app.setLoginItemSettings({
         openAtLogin: db.read().get('profile.boot').value(),
         path: process.execPath,
@@ -214,7 +214,7 @@ function handler() {
                 }
                 notification.close();
             });
-        }, 3000);
+        }, 1500);
     }));
 
     ipcMain.on('start-rest', (event, arg) => {
@@ -231,7 +231,9 @@ function handler() {
     });
 
     ipcMain.on('start-work', (sys, msg) => {
-        win.hide();
+        console.log()
+        if (db.read().get('profile.startWorkHideWindow').value())
+            win.hide();
         let notification = new Notification({
             icon: path.join(__dirname, icon),
             title: "番茄时钟",

@@ -3,6 +3,20 @@
     margin: 0;
 }
 
+.fl {
+    float: left;
+}
+
+.fr {
+    float: right;
+}
+
+.clear {
+    content: "";
+    display: block;
+    clear: both;
+}
+
 html {
     background-color: #87CEEB;
 }
@@ -190,4 +204,25 @@ html {
 .second .pause-btn:hover {
     /* background: #2980b9; */
     background: #d35400;
+}
+
+.todo {
+    width: 70%;
+    height: 60%;
+    position: absolute;
+    z-index: 0;
+    top: calc(50% - 35%);
+    left: calc(50% - 35%);
+    background-color: #e67e22;
+    display: none;
+}
+
+.first .todo-btn {
+    background: #e74c3c;
+    top: calc(50% + 30px);
+    display: none;
+}
+
+.first .todo-btn:hover {
+    background: #c0392b;
 }

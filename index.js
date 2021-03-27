@@ -81,62 +81,35 @@ function startTimer(second) {
 
 function run(type) {
     timer = new Timer({
-        onstart: () => timerStart(type),
+        onstart: () => {
+            view({type: type, start: true});
+            if (type === 'work') {
+                ipcRenderer.send('start-work', "开始工作! 倒计时：" + getClockTime(workTime));
+            } else if (type === 'rest') {
+                ipcRenderer.send('start-rest', restTime);
+            }
+        },
         ontick: (ms) => $(timerDivSelector).html(getClockTime(Math.round(ms / 1000))),
-        onend: () => timerEnd(type)
+        onend: () => {
+            view({type: type, end: true});
+            if (type === 'work') {
+                ipcRenderer.send('work-to-rest');
+            } else if (type === 'rest') {
+                ipcRenderer.send("end-rest", "休息完成!");
+            }
+            clearTimer();
+        }
     });
 
     if (!isClocking) {
-        $(firstFrameSelector).css("display", 'none');
-        $(secondFrameSelector).css("display", 'block');
+        view({type: 'second'});
         isClocking = true;
         if (type === 'work') {
-            $(timerDivSelector).html(getClockTime(workTime));
             startTimer(workTime);
         } else if (type === 'rest') {
-            $(timerDivSelector).html(getClockTime(restTime));
             startTimer(restTime);
         }
     }
-}
-
-/**
- * 开始计时调用执行
- */
-function timerStart(type) {
-    $(taskBtnSelector).css("display", 'none');
-    $(pauseBtnSelector).css("display", 'block');
-    $(pauseBtnSelector).html('暂停');
-
-    if (type === 'work') {
-        $(taskBtnSelector).html("休息");
-        $(titleDivSelector).html("Working");
-        ipcRenderer.send('start-work', "开始工作! 倒计时：" + getClockTime(workTime));
-    } else if (type === 'rest') {
-        $(taskBtnSelector).html("工作");
-        $(titleDivSelector).html("Resting");
-        ipcRenderer.send('start-rest', restTime);
-        $(pauseBtnSelector).css("display", "none");
-    }
-}
-
-/**
- * 计时结束调用执行
- */
-function timerEnd(type) {
-    $(pauseBtnSelector).css("display", 'none');
-    $(taskBtnSelector).css("display", 'block');
-    $(titleDivSelector).html('');
-
-    if (type === 'work') {
-        $(timerDivSelector).html('工作完成!');
-        ipcRenderer.send('work-to-rest');
-    } else if (type === 'rest') {
-        let notification = "休息完成!";
-        $(timerDivSelector).html(notification);
-        ipcRenderer.send("end-rest", notification);
-    }
-    clearTimer();
 }
 
 function main() {
@@ -162,6 +135,21 @@ function main() {
 
     $(workBtnSelector).on("click", () => run('work'));
 
+    $(document).on("keydown", (e) => {
+        if (isFirstFrame()) {
+            // 空格 或 回车键
+            if (e.keyCode === 32 || e.keyCode === 13) {
+                $(workBtnSelector).click();
+            }
+        } else {
+            if (!isClocking) {
+                if (e.keyCode === 32 || e.keyCode === 13) {
+                    $(taskBtnSelector).click();
+                }
+            }
+        }
+    });
+
     $(restBtnSelector).click(() => run('rest'));
 
     ipcRenderer.on('start-work-main', () => $(workBtnSelector).click());
@@ -169,18 +157,16 @@ function main() {
     ipcRenderer.on('start-rest-main', () => $(restBtnSelector).click());
 
     $(homeBtnSelector).click(() => {
-        if ($(firstFrameSelector).css("display") === 'none') {
+        if (!isFirstFrame()) {
             if (isClocking) {
                 let reply = ipcRenderer.sendSync('synchronous-message', 'quit-timer');
                 if (reply === 'yes') {
                     clearTimer();
-                    $(firstFrameSelector).css("display", "block");
-                    $(secondFrameSelector).css("display", "none");
+                    view({type: 'first'});
                 }
             } else {
                 clearTimer();
-                $(firstFrameSelector).css("display", "block");
-                $(secondFrameSelector).css("display", "none");
+                view({type: 'first'});
             }
         }
     });
@@ -197,11 +183,11 @@ function main() {
         if (timer != null) {
             if (isPause) {
                 timer.start();
-                $(pauseBtnSelector).html("暂停");
+                view({type: 'continue'});
                 isPause = false;
             } else {
+                view({type: 'pause'});
                 timer.pause();
-                $(pauseBtnSelector).html("继续");
                 isPause = true;
             }
         }
@@ -209,14 +195,11 @@ function main() {
 
     $(taskBtnSelector).click(() => {
         clearTimer();
-        $(taskBtnSelector).css("display", "none");
-        $(pauseBtnSelector).css("display", "block");
         if ($(taskBtnSelector).text().trim() === '工作') {
             run('work');
         } else if ($(taskBtnSelector).text().trim() === '休息') {
             run('rest');
         }
-        $(settingFrameSelector).fadeOut('fast');
     });
 }
 
@@ -228,6 +211,50 @@ function getClockTime(second) {
     let mm = Math.floor(second / 60);
     let hh = Math.floor(second / 3600);
     return ((hh === 0) ? "" : hh.toString().padStart(2, '0') + ":") + mm.toString().padStart(2, '0') + ":" + ss.toString().padStart(2, '0');
+}
+
+
+function isFirstFrame() {
+    return $(firstFrameSelector).css('display') === 'block';
+}
+
+function view({type, start, end}) {
+    if (type === 'work' || type === 'rest') {
+        if (start) {
+            $(taskBtnSelector).hide();
+            $(pauseBtnSelector).html('暂停');
+            if (type === 'work') {
+                $(timerDivSelector).html(getClockTime(workTime));
+                $(pauseBtnSelector).show();
+                $(taskBtnSelector).html("休息");
+                $(titleDivSelector).html("Working");
+            } else if (type === 'rest') {
+                $(timerDivSelector).html(getClockTime(restTime));
+                $(pauseBtnSelector).hide();
+                $(taskBtnSelector).html("工作");
+                $(titleDivSelector).html("Resting");
+            }
+        } else if (end) {
+            $(pauseBtnSelector).hide();
+            $(taskBtnSelector).show();
+            $(titleDivSelector).html('');
+            if (type === 'work') {
+                $(timerDivSelector).html('工作完成!');
+            } else if (type === 'rest') {
+                $(timerDivSelector).html("休息完成!");
+            }
+        }
+    } else if (type === 'pause') {
+        $(pauseBtnSelector).html("继续");
+    } else if (type === 'continue') {
+        $(pauseBtnSelector).html("暂停");
+    } else if (type === 'first') {
+        $(firstFrameSelector).show();
+        $(secondFrameSelector).hide();
+    } else if (type === 'second') {
+        $(firstFrameSelector).hide();
+        $(secondFrameSelector).show();
+    }
 }
 
 /**
