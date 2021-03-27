@@ -4,13 +4,11 @@ const Timer = require('timer.js');
 window.$ = window.jQuery = require('jquery');
 
 const path = require('path');
-
+const lowdb = require('lowdb');
 const appDataPath = remote.app.getPath('desktop');
 if (!fs.existsSync(appDataPath)) {
     fs.mkdirSync(appDataPath);
 }
-
-const lowdb = require('lowdb');
 const FileSync = require('lowdb/adapters/FileSync');
 const adapter = new FileSync(path.join(appDataPath, 'settings.json'));
 const db = lowdb(adapter);
@@ -236,9 +234,9 @@ function getClockTime(second) {
  * 初始化数据
  */
 function initData() {
-    workTime = db.get('work').value();
-    restTime = db.get('rest').value();
-    background = db.get('background').value();
+    workTime = db.get('profile.work').value();
+    restTime = db.get('profile.rest').value();
+    background = db.get('profile.background').value();
 
     updateViewData();
 }
@@ -248,17 +246,17 @@ function initData() {
  */
 function updateData({workHours, restHours, backgroundColor}) {
     if (workHours != null) {
-        db.set('work', workHours).write();
+        db.set('profile.work', workHours).write();
         workTime = workHours;
     }
 
     if (restHours != null) {
-        db.set('rest', restHours).write();
+        db.set('profile.rest', restHours).write();
         restTime = restHours;
     }
 
     if (backgroundColor != null) {
-        db.set('background', backgroundColor).write();
+        db.set('profile.background', backgroundColor).write();
         background = backgroundColor;
     }
 

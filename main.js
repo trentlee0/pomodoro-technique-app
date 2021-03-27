@@ -1,8 +1,7 @@
 const {app, globalShortcut, ipcMain, dialog, BrowserWindow, Menu, Tray, Notification} = require('electron');
+
 const fs = require('fs');
 const path = require('path');
-
-const exeName = path.basename(process.execPath);
 
 const lowdb = require('lowdb');
 const FileSync = require('lowdb/adapters/FileSync');
@@ -13,19 +12,23 @@ if (!fs.existsSync(appDataPath)) {
 const adapter = new FileSync(path.join(appDataPath, 'settings.json'));
 const db = lowdb(adapter);
 
+db.defaults({
+    profile: {
+        work: 10,
+        rest: 5,
+        background: "#87CEAA",
+        showWindowShortcut: 'CmdOrCtrl+Shift+T',
+        boot: false,
+        startWorkNotification: true
+    }
+}).write();
+
 const icon = "img/icon.ico";
 const trayIcon = "img/icon_tray.ico";
 const trayWorkIcon = "img/icon_tray_work.ico";
 
-db.defaults({
-    work: 10,
-    rest: 5,
-    background: "#87CEAA",
-    devToolsOpened: false,
-    boot: false
-}).write();
-
 let win;
+let tray;
 
 function createWindow() {
     win = new BrowserWindow({
@@ -46,6 +49,10 @@ function createWindow() {
 
     Menu.setApplicationMenu(null);
     initSettings();
+
+    createTray();
+
+    handler();
 
     win.on('closed', (event) => {
         win = null;
@@ -77,70 +84,42 @@ function createWindow() {
  */
 function initSettings() {
     app.setLoginItemSettings({
-        openAtLogin: db.read().get('boot').value(),
+        openAtLogin: db.read().get('profile.boot').value(),
         path: process.execPath,
-        args: [
-            "--openAsHidden"
-        ]
+        args: ["--openAsHidden"]
     });
 
-    if (db.read().get('devToolsOpened').value()) {
-        win.webContents.openDevTools();
-    } else {
-        win.webContents.closeDevTools();
-    }
-}
-
-if (!app.requestSingleInstanceLock()) {
-    app.quit()
-} else {
-    app.on('second-instance', (event, commandLine, workingDirectory) => {
-        // 当运行第二个实例时,将会聚焦到win这个窗口
-        if (win) {
-            if (win.isMinimized()) win.restore();
-            win.focus();
-            win.show();
-        }
-    });
-}
-
-app.whenReady().then(() => {
     //全局快捷键
-    globalShortcut.register('CommandOrControl+Shift+T', () => {
+    globalShortcut.register(db.read().get('profile.showWindowShortcut').value(), () => {
         win.isVisible() ? win.hide() : win.show();
     });
-}).then(createWindow);
+}
 
-//系统托盘
-let tray = null;
-app.whenReady().then(() => {
+function createTray() {
     tray = new Tray(path.join(__dirname, trayIcon));
     const trayMenu = Menu.buildFromTemplate([
         {
             label: '显示/隐藏窗口',
-            accelerator: 'Ctrl+Shift+T',
+            accelerator: db.read().get('profile.showWindowShortcut').value(),
             click: () => win.isVisible() ? win.hide() : win.show()
 
         },
         {
-            type: 'checkbox',
             label: '开发者模式',
-            checked: db.read().get('devToolsOpened').value(),
             click: () => {
                 if (win.isDevToolsOpened()) {
                     win.webContents.closeDevTools();
                 } else {
                     win.webContents.openDevTools();
                 }
-                db.set('devToolsOpened', win.isDevToolsOpened()).write();
             }
         },
         {
             type: 'checkbox',
             label: '开机启动',
-            checked: db.read().get('boot').value(),
+            checked: db.read().get('profile.boot').value(),
             click: function () {
-                let boot = !db.read().get('boot').value();
+                let boot = !db.read().get('profile.boot').value();
                 app.setLoginItemSettings({
                     openAtLogin: boot,
                     path: process.execPath,
@@ -148,7 +127,7 @@ app.whenReady().then(() => {
                         "--openAsHidden"
                     ]
                 });
-                db.set('boot', boot).write();
+                db.set('profile.boot', boot).write();
             }
         },
         {
@@ -176,112 +155,131 @@ app.whenReady().then(() => {
     tray.on('click', () => {
         win.isVisible() ? win.hide() : win.show();
     });
-});
+}
 
-ipcMain.on('synchronous-message', (event, arg) => {
-    if (arg === 'quit-timer') {
-        let index = dialog.showMessageBoxSync(win, {
-            type: 'question',
-            buttons: ['确定', '取消'],
-            title: '提示',
-            message: '退出倒计时？',
-            defaultId: 1,
-            cancelId: 1
-        });
-        if (index === 0) {
-            event.returnValue = 'yes';
+function handler() {
+    ipcMain.on('synchronous-message', (event, arg) => {
+        if (arg === 'quit-timer') {
+            let index = dialog.showMessageBoxSync(win, {
+                type: 'question',
+                buttons: ['确定', '取消'],
+                title: '提示',
+                message: '退出倒计时？',
+                defaultId: 1,
+                cancelId: 1
+            });
+            if (index === 0) {
+                event.returnValue = 'yes';
 
-            tray.setImage(path.join(__dirname, trayIcon));
-            tray.setToolTip("番茄时钟");
-        } else {
-            event.returnValue = 'no';
-        }
-    }
-});
-
-ipcMain.on("work-to-rest", ((event, args) => {
-    let msg = '已经工作一段时间了，休息一下吧！';
-    let notification = new Notification({
-        icon: path.join(__dirname, icon),
-        title: "番茄时钟",
-        body: msg,
-        timeoutType: "never"
-    });
-
-    tray.setImage(path.join(__dirname, trayIcon));
-    tray.setToolTip("番茄时钟");
-
-    notification.show();
-    notification.on('click', () => {
-        if (!win.isVisible()) win.show();
-    });
-
-    setTimeout(() => {
-        win.show();
-        win.setAlwaysOnTop(true);
-        dialog.showMessageBox(win, {
-            type: 'question',
-            buttons: ['取消', '休息一下'],
-            title: '提示',
-            message: msg,
-            defaultId: 1,
-            cancelId: 0
-        }).then((promise) => {
-            if (promise.response === 1) {
-                win.webContents.send('start-rest-main');
-                notification.close();
-            } else if (promise.response === 0) {
-                win.setAlwaysOnTop(false);
-                notification.close();
+                tray.setImage(path.join(__dirname, trayIcon));
+                tray.setToolTip("番茄时钟");
+            } else {
+                event.returnValue = 'no';
             }
+        }
+    });
+
+    ipcMain.on("work-to-rest", ((event, args) => {
+        let msg = '已经工作一段时间了，休息一下吧！';
+        let notification = new Notification({
+            icon: path.join(__dirname, icon),
+            title: "番茄时钟",
+            body: msg,
+            timeoutType: "never"
         });
-    }, 3000);
-}));
 
-ipcMain.on('start-rest', (event, arg) => {
-    let rest = parseInt(arg);
-    win.setAlwaysOnTop(true);
-    win.setMovable(false);
-    win.setMinimizable(false);
+        tray.setImage(path.join(__dirname, trayIcon));
+        tray.setToolTip("番茄时钟");
 
-    setTimeout(() => {
-        win.setAlwaysOnTop(false);
-        win.setMovable(true);
-        win.setMinimizable(true);
-    }, (rest - 1) * 1000);
-});
+        notification.show();
+        notification.on('click', () => {
+            if (!win.isVisible()) win.show();
+        });
 
-ipcMain.on('start-work', (sys, msg) => {
-    win.hide();
-    let notification = new Notification({
-        icon: path.join(__dirname, icon),
-        title: "番茄时钟",
-        body: msg,
-        silent: true
+        setTimeout(() => {
+            win.show();
+            win.setAlwaysOnTop(true);
+            dialog.showMessageBox(win, {
+                type: 'question',
+                buttons: ['取消', '休息一下'],
+                title: '提示',
+                message: msg,
+                defaultId: 1,
+                cancelId: 0
+            }).then((promise) => {
+                if (promise.response === 1) {
+                    win.webContents.send('start-rest-main');
+                } else if (promise.response === 0) {
+                    win.setAlwaysOnTop(false);
+                }
+                notification.close();
+            });
+        }, 3000);
+    }));
+
+    ipcMain.on('start-rest', (event, arg) => {
+        let rest = parseInt(arg);
+        win.setAlwaysOnTop(true);
+        win.setMovable(false);
+        win.setMinimizable(false);
+
+        setTimeout(() => {
+            win.setAlwaysOnTop(false);
+            win.setMovable(true);
+            win.setMinimizable(true);
+        }, (rest - 1) * 1000);
     });
 
-    tray.setImage(path.join(__dirname, trayWorkIcon));
-    tray.setToolTip("Working...");
+    ipcMain.on('start-work', (sys, msg) => {
+        win.hide();
+        let notification = new Notification({
+            icon: path.join(__dirname, icon),
+            title: "番茄时钟",
+            body: msg,
+            silent: true
+        });
 
-    notification.show();
-    setTimeout(() => {
-        notification.close();
-    }, 2000);
-});
+        tray.setImage(path.join(__dirname, trayWorkIcon));
+        tray.setToolTip("💻Working...");
 
-ipcMain.on("end-rest", (sys, msg) => {
-    let notification = new Notification({
-        icon: path.join(__dirname, icon),
-        title: "番茄时钟",
-        body: msg
+        if (db.read().get('profile.startWorkNotification').value()) {
+            notification.show();
+
+            setTimeout(() => {
+                notification.close();
+            }, 2000);
+        }
     });
 
-    notification.show();
+    ipcMain.on("end-rest", (sys, msg) => {
+        let notification = new Notification({
+            icon: path.join(__dirname, icon),
+            title: "番茄时钟",
+            body: msg
+        });
 
-    setTimeout(() => {
-        notification.close();
-    }, 3000);
-});
+        notification.show();
+
+        setTimeout(() => {
+            notification.close();
+        }, 3000);
+    });
+}
+
+if (!app.requestSingleInstanceLock()) {
+    app.quit()
+} else {
+    app.on('second-instance', (event, commandLine, workingDirectory) => {
+        // 当运行第二个实例时,将会聚焦到win这个窗口
+        if (win) {
+            if (win.isMinimized()) win.restore();
+            win.focus();
+            win.show();
+        }
+    });
+}
+
+app.whenReady().then(createWindow);
 
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
