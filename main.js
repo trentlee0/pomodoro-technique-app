@@ -5,11 +5,11 @@ const path = require('path');
 
 const lowdb = require('lowdb');
 const FileSync = require('lowdb/adapters/FileSync');
-const appDataPath = app.getPath("desktop");
+const appDataPath = app.getPath("appData");
 if (!fs.existsSync(appDataPath)) {
     fs.mkdirSync(appDataPath);
 }
-const adapter = new FileSync(path.join(appDataPath, 'settings.json'));
+const adapter = new FileSync(path.join(appDataPath, 'tomato/settings.json'));
 const db = lowdb(adapter);
 
 db.defaults({
