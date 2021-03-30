@@ -198,6 +198,7 @@ function handler() {
 
         setTimeout(() => {
             win.show();
+            win.focus();
             win.setAlwaysOnTop(true);
             dialog.showMessageBox(win, {
                 type: 'question',
@@ -231,7 +232,6 @@ function handler() {
     });
 
     ipcMain.on('start-work', (sys, msg) => {
-        console.log()
         if (db.read().get('profile.startWorkHideWindow').value())
             win.hide();
         let notification = new Notification({

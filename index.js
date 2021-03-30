@@ -137,13 +137,13 @@ function main() {
 
     $(document).on("keydown", (e) => {
         if (isFirstFrame()) {
-            // 空格 或 回车键
-            if (e.keyCode === 32 || e.keyCode === 13) {
+            // 空格
+            if (e.keyCode === 32) {
                 $(workBtnSelector).click();
             }
         } else {
             if (!isClocking) {
-                if (e.keyCode === 32 || e.keyCode === 13) {
+                if (e.keyCode === 32) {
                     $(taskBtnSelector).click();
                 }
             }
