@@ -1,28 +1,10 @@
-const {app, globalShortcut, ipcMain, dialog, BrowserWindow, Menu, Tray, Notification} = require('electron');
-
-const fs = require('fs');
+const {app, globalShortcut, ipcMain, dialog, shell, BrowserWindow, Menu, Tray, Notification} = require('electron');
+const ioHook = require('iohook');
 const path = require('path');
-
-const lowdb = require('lowdb');
-const FileSync = require('lowdb/adapters/FileSync');
-const appDataPath = app.getPath("appData");
-if (!fs.existsSync(appDataPath)) {
-    fs.mkdirSync(appDataPath);
-}
-const adapter = new FileSync(path.join(appDataPath, 'tomato/settings.json'));
-const db = lowdb(adapter);
-
-db.defaults({
-    profile: {
-        work: 2700,
-        rest: 300,
-        background: "#87CEAA",
-        showWindowShortcut: 'CmdOrCtrl+Shift+T',
-        boot: false,
-        startWorkNotification: true,
-        startWorkHideWindow: true
-    }
-}).write();
+const dataStore = require('./js/datastore');
+const array = dataStore.getDb(app);
+const db = array['db'];
+const confFile = array['confFile'];
 
 const icon = "img/icon.ico";
 const trayIcon = "img/icon_tray.ico";
@@ -30,6 +12,9 @@ const trayWorkIcon = "img/icon_tray_work.ico";
 
 let win;
 let tray;
+let isResting = false;
+let isWorking = false;
+let leaveTimer = null;
 
 function createWindow() {
     win = new BrowserWindow({
@@ -52,6 +37,10 @@ function createWindow() {
     createTray();
     handler();
 
+    if (db.read().get('profile.mode').value() === 'auto') {
+        autoMode();
+    }
+
     win.on('closed', (event) => {
         win = null;
     });
@@ -70,11 +59,36 @@ function createWindow() {
     });
 
     win.once('ready-to-show', () => {
-        if (process.argv.indexOf("--openAsHidden") > 0)
+        if (process.argv.indexOf("--openAsHidden") > 0) {
+            win.webContents.send('start-work-main');
             win.hide();
-        else
-            win.show();
+        } else {
+            if (db.read().get('profile.mode').value() === 'auto') {
+                win.webContents.send('start-work-main');
+            } else {
+                win.show();
+            }
+        }
     });
+}
+
+function autoMode() {
+    ioHook.start();
+    ioHook.on('mousemove', () => pauseClocking());
+    ioHook.on('keydown', () => pauseClocking());
+}
+
+function pauseClocking() {
+    if (!isWorking) {
+        win.webContents.send('pause-work');
+    }
+    clearTimeout(leaveTimer);
+    leaveTimer = setTimeout(() => {
+        win.webContents.send('pause-work');
+        tray.setImage(path.join(__dirname, trayIcon));
+        tray.setToolTip("番茄时钟");
+        isWorking = false;
+    }, 1000 * 10);
 }
 
 /**
@@ -84,15 +98,26 @@ function initSettings() {
     Menu.setApplicationMenu(null);
 
     app.setLoginItemSettings({
-        openAtLogin: db.read().get('profile.boot').value(),
+        openAtLogin: app.isPackaged ? db.read().get('profile.boot').value() : false,
         path: process.execPath,
         args: ["--openAsHidden"]
     });
 
     //全局快捷键
     globalShortcut.register(db.read().get('profile.showWindowShortcut').value(), () => {
-        win.isVisible() ? win.hide() : win.show();
+        showOrHideMainWindow();
     });
+}
+
+function showOrHideMainWindow() {
+    if (!isResting) {
+        if (win.isVisible()) {
+            win.hide();
+        } else {
+            win.show();
+            win.focus();
+        }
+    }
 }
 
 function createTray() {
@@ -101,8 +126,11 @@ function createTray() {
         {
             label: '显示/隐藏窗口',
             accelerator: db.read().get('profile.showWindowShortcut').value(),
-            click: () => win.isVisible() ? win.hide() : win.show()
-
+            click: () => {
+                if (!isResting) {
+                    win.isVisible() ? win.hide() : win.show()
+                }
+            }
         },
         {
             label: '开发者模式',
@@ -131,6 +159,12 @@ function createTray() {
             }
         },
         {
+            label: '配置文件',
+            click: () => {
+                shell.showItemInFolder(confFile);
+            }
+        },
+        {
             label: '工作',
             click: () => {
                 win.webContents.send('start-work-main');
@@ -146,15 +180,35 @@ function createTray() {
         },
         {
             label: '退出',
-            click: () => win.destroy()
+            accelerator: "Ctrl+W",
+            click: () => quitHandler()
         }
     ]);
 
     tray.setToolTip('番茄时钟');
     tray.setContextMenu(trayMenu);
-    tray.on('click', () => {
-        win.isVisible() ? win.hide() : win.show();
-    });
+    tray.on('click', () => showOrHideMainWindow());
+}
+
+function quitHandler() {
+    if (isWorking || isResting) {
+        console.log("rest: " + isResting);
+        console.log("work: " + isWorking);
+        dialog.showMessageBox(win, {
+            type: 'question',
+            buttons: ['退出', '取消'],
+            title: '提示',
+            message: '当前正在倒计时，确定退出吗？',
+            defaultId: 1,
+            cancelId: 0
+        }).then((promise) => {
+            if (promise.response === 0) {
+                win.destroy();
+            }
+        });
+    } else {
+        win.destroy();
+    }
 }
 
 function handler() {
@@ -170,6 +224,9 @@ function handler() {
             });
             if (index === 0) {
                 event.returnValue = 'yes';
+                isResting = false;
+                isWorking = false;
+                handleResting(isResting);
 
                 tray.setImage(path.join(__dirname, trayIcon));
                 tray.setToolTip("番茄时钟");
@@ -179,7 +236,10 @@ function handler() {
         }
     });
 
-    ipcMain.on("work-to-rest", ((event, args) => {
+
+    /************ 异步 ************/
+
+    ipcMain.on("end-work", ((event, args) => {
         let msg = '已经工作一段时间了，休息一下吧！';
         let notification = new Notification({
             icon: path.join(__dirname, icon),
@@ -190,10 +250,14 @@ function handler() {
 
         tray.setImage(path.join(__dirname, trayIcon));
         tray.setToolTip("番茄时钟");
+        isWorking = false;
 
         notification.show();
         notification.on('click', () => {
-            if (!win.isVisible()) win.show();
+            if (!win.isVisible()) {
+                win.show();
+                win.focus();
+            }
         });
 
         setTimeout(() => {
@@ -202,15 +266,15 @@ function handler() {
             win.setAlwaysOnTop(true);
             dialog.showMessageBox(win, {
                 type: 'question',
-                buttons: ['取消', '休息一下'],
+                buttons: ['休息一下', '取消'],
                 title: '提示',
                 message: msg,
-                defaultId: 1,
+                defaultId: 0,
                 cancelId: 0
             }).then((promise) => {
-                if (promise.response === 1) {
+                if (promise.response === 0) {
                     win.webContents.send('start-rest-main');
-                } else if (promise.response === 0) {
+                } else if (promise.response === 1) {
                     win.setAlwaysOnTop(false);
                 }
                 notification.close();
@@ -218,31 +282,32 @@ function handler() {
         }, 1500);
     }));
 
-    ipcMain.on('start-rest', (event, arg) => {
-        let rest = parseInt(arg);
-        win.setAlwaysOnTop(true);
-        win.setMovable(false);
-        win.setMinimizable(false);
-
-        setTimeout(() => {
-            win.setAlwaysOnTop(false);
-            win.setMovable(true);
-            win.setMinimizable(true);
-        }, (rest - 1) * 1000);
-    });
-
-    ipcMain.on('start-work', (sys, msg) => {
-        if (db.read().get('profile.startWorkHideWindow').value())
-            win.hide();
+    ipcMain.on("end-rest", (event, args) => {
         let notification = new Notification({
             icon: path.join(__dirname, icon),
             title: "番茄时钟",
-            body: msg,
+            body: args
+        });
+
+        notification.show();
+        win.focus();
+
+        setTimeout(() => {
+            notification.close();
+        }, 3000);
+    });
+
+    ipcMain.on('start-work', (event, args) => {
+        let notification = new Notification({
+            icon: path.join(__dirname, icon),
+            title: "番茄时钟",
+            body: args,
             silent: true
         });
 
         tray.setImage(path.join(__dirname, trayWorkIcon));
         tray.setToolTip("💻 Working...");
+        isWorking = true;
 
         if (db.read().get('profile.startWorkNotification').value()) {
             notification.show();
@@ -253,20 +318,25 @@ function handler() {
         }
     });
 
-    ipcMain.on("end-rest", (sys, msg) => {
-        let notification = new Notification({
-            icon: path.join(__dirname, icon),
-            title: "番茄时钟",
-            body: msg
-        });
-
-        notification.show();
-        win.focus();
+    ipcMain.on('start-rest', (event, args) => {
+        let rest = parseInt(args);
+        isResting = true;
+        handleResting(isResting);
 
         setTimeout(() => {
-            notification.close();
-        }, 3000);
+            isResting = false;
+            handleResting(isResting);
+        }, (rest - 1) * 1000);
     });
+
+    ipcMain.on('quit-app', (event, args) => quitHandler());
+}
+
+function handleResting(isResting) {
+    win.setAlwaysOnTop(isResting);
+    win.setMovable(!isResting);
+    win.setMinimizable(!isResting);
+    win.setClosable(!isResting);
 }
 
 if (!app.requestSingleInstanceLock()) {

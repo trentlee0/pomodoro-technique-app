@@ -1,24 +1,17 @@
-* {
-    padding: 0;
-    margin: 0;
+/* Light mode */
+@media (prefers-color-scheme: light) {
+    html {
+        content: "light";
+        background-color: #87CE00;
+    }
 }
 
-.fl {
-    float: left;
-}
-
-.fr {
-    float: right;
-}
-
-.clear {
-    content: "";
-    display: block;
-    clear: both;
-}
-
-html {
-    background-color: #87CEEB;
+/* Dark mode */
+@media (prefers-color-scheme: dark) {
+    html {
+        content: "dark";
+        background-color: #87CEAA;
+    }
 }
 
 .btn {
@@ -40,7 +33,7 @@ html {
     margin: 8px;
     left: 0;
     /* background: red; */
-    background-image: url('../img/home.png');
+    background-image: url('home.png');
     background-size: contain;
     z-index: 4;
 }
@@ -53,17 +46,18 @@ html {
     margin: 8px;
     right: 0;
     /* background: red; */
-    background-image: url('../img/setting.png');
+    background-image: url('setting.png');
     background-size: contain;
     z-index: 4;
 }
 
+
+/* 设置面板 */
 .setting-frame {
     position: fixed;
-    width: 270px;
+    width: 280px;
     height: 100%;
     right: 0;
-    /* background: #95a5a6; */
     background: #d9d9d9;
     z-index: 3;
     display: none;
@@ -80,36 +74,51 @@ html {
 }
 
 .setting-frame ul li {
-    width: 175px;
+    width: 195px;
+    height: 51px;
     font-weight: bold;
     /* background-color: yellowgreen; */
-    padding-right: 10px;
+    /*padding-right: 10px;*/
     padding-left: 10px;
     border-bottom: 1px solid #595959;
 }
 
-.setting-frame ul li input {
-    border: none;
+.setting-frame ul li .in {
+    vertical-align: middle;
     width: 45px;
+    border: none;
     outline: none;
     margin-left: 8px;
+    padding: 2px;
     margin-right: 5px;
-    padding-top: 5px;
 }
 
-.setting-frame ul #color-input {
-    width: 61px;
-    padding: 5px 5px 0;
-
+.setting-frame ul li #theme-input {
+    width: 70px;
+    margin-right: 2px;
+    font-weight: bold;
 }
 
-.setting-frame ul li #color-show {
-    width: 10px;
-    height: 14px;
-    margin-left: 1px;
-    display: inline-block;
-    background-color: #87CEEB;
-    border: 1px solid #595959;
+.setting-frame ul #theme-show-li #open-theme-file {
+    width: 35px;
+    height: 20px;
+    font-size: 11px;
+}
+
+.setting-frame ul #mode-li .mode-title {
+    margin-right: 5px;
+}
+
+.setting-frame ul #mode-li .timer-mode {
+    font-size: 13px;
+    /* background: yellow; */
+}
+
+.setting-frame ul #mode-li .timer-mode input {
+    width: 20px;
+    margin-left: 0;
+    margin-right: 0;
+    padding-top: 0;
 }
 
 .setting-frame .save-btn {
@@ -134,6 +143,26 @@ html {
     background: #c0392b;
 }
 
+.tip {
+    font-size: large;
+    font-weight: bold;
+    height: 65px;
+    text-align: center;
+    width: 500px;
+    position: absolute;
+    left: calc(50% - 250px);
+    top: 80px;
+    color: #595959;
+    /*background: #595959;*/
+}
+
+
+/* 首界面 */
+.first .tip {
+    font-size: x-large;
+    top: 140px;
+    color: #262626;
+}
 
 .first .work-btn {
     background: #1abc9c;
@@ -154,6 +183,7 @@ html {
 }
 
 
+/* 倒计时界面 */
 .second {
     display: none;
 }
@@ -204,25 +234,4 @@ html {
 .second .pause-btn:hover {
     /* background: #2980b9; */
     background: #d35400;
-}
-
-.todo {
-    width: 70%;
-    height: 60%;
-    position: absolute;
-    z-index: 0;
-    top: calc(50% - 35%);
-    left: calc(50% - 35%);
-    background-color: #e67e22;
-    display: none;
-}
-
-.first .todo-btn {
-    background: #e74c3c;
-    top: calc(50% + 30px);
-    display: none;
-}
-
-.first .todo-btn:hover {
-    background: #c0392b;
 }
