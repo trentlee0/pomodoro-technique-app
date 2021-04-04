@@ -6,19 +6,31 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>番茄时钟</title>
-    <link type="text/css" rel="stylesheet" href="css/index.css"/>
-    <script src="index.js"></script>
+    <link type="text/css" rel="stylesheet" href="css/common.css"/>
+    <link id="theme" type="text/css" rel="stylesheet" href="css/theme/default/default.css"/>
+    <script src="js/index.js"></script>
 </head>
 
 <body>
 <div class="home-btn"></div>
 <div class="setting-btn"></div>
 <div class="setting-frame">
-    <ul>
-        <li>工作时间<input id="work-input" type="number"/>秒</li>
-        <li>休息时间<input id="rest-input" type="number"/>秒</li>
-        <li>背景颜色<input id="color-input" type="text"/>
-            <div id="color-show"></div>
+    <ul class="clear">
+        <li class="in">今日番茄数：<span id="tomato-today-count"></span>个</li>
+        <li class="in">总番茄数：<span id="tomato-all-count"></span>个</li>
+        <li>工作时间<input class="in" id="work-input" type="number"/>分</li>
+        <li>休息时间<input class="in" id="rest-input" type="number"/>分</li>
+        <li id="theme-show-li">
+            应用主题<select class="in" id="theme-input">
+        </select>
+            <input id="open-theme-file" type="button" value="Open"/>
+        </li>
+        <li id="mode-li" class="clear">
+            <div class="mode-title fl">计时模式</div>
+            <div class="timer-mode fl">
+                <input class="in" id="manual-mode" type="radio" name="mode" value="manual"/>手动
+                <input class="in" id="auto-mode" type="radio" name="mode" value="auto"/>自动
+            </div>
         </li>
     </ul>
     <div class="btn save-btn">保存</div>
@@ -26,19 +38,17 @@
 </div>
 <div class="container">
     <div class="first">
+        <div class="tip">开始工作吧!</div>
         <div class="btn work-btn" title="工作 (Space)">
             工作
         </div>
         <div class="btn rest-btn">
             休息
         </div>
-        <div class="btn todo-btn">
-            清单
-        </div>
     </div>
     <div class="second">
-        <div class="title">
-        </div>
+        <div id="work-tip" class="tip"></div>
+        <div class="title"></div>
         <div class="timer">
             00:00
         </div>
@@ -48,8 +58,7 @@
             暂停
         </div>
     </div>
-    <div class="todo">
-    </div>
 </div>
 </body>
+
 </html>

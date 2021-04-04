@@ -1,17 +1,11 @@
-const {ipcRenderer, remote} = require('electron');
+const {ipcRenderer, remote, shell} = require('electron');
 const fs = require('fs');
+const path = require('path');
 const Timer = require('timer.js');
 window.$ = window.jQuery = require('jquery');
+const dataStore = require('./js/datastore');
+const db = dataStore.getDb(remote.app)['db'];
 
-const path = require('path');
-const lowdb = require('lowdb');
-const userDataPath = remote.app.getPath('userData');
-if (!fs.existsSync(userDataPath)) {
-    fs.mkdirSync(userDataPath);
-}
-const FileSync = require('lowdb/adapters/FileSync');
-const adapter = new FileSync(path.join(userDataPath, '/settings.json'));
-const db = lowdb(adapter);
 
 /** 第一个界面 */
 const firstFrameSelector = ".first";
@@ -40,25 +34,42 @@ const workInputSelector = "#work-input";
 /** 输入休息时间的文本框 */
 const restInputSelector = "#rest-input";
 /** 输入背景颜色的文本框 */
-const colorInputSelector = "#color-input";
-/** 显示颜色提示 */
-const colorShowSelector = "#color-show";
+const themeInputSelector = "#theme-input";
 /** 显示标题的元素 */
 const titleDivSelector = ".title";
 /** 显示倒计时的元素 */
 const timerDivSelector = ".timer";
+/** 手动模式单选按钮 */
+const manualModeSelector = "#manual-mode";
+/** 自动模式单选按钮 */
+const autoModeSelector = "#auto-mode";
+const openThemeFileSelector = "#open-theme-file";
+/** 工作时，提示的文字 */
+const workTipSelector = "#work-tip";
+/** 显示总番茄数的元素 */
+const tomatoAllCountSelector = "#tomato-all-count";
+/** 显示今日番茄数的元素 */
+const tomatoTodayCountSelector = "#tomato-today-count";
 
+/** 总番茄数 */
+let tomatoAllCount = 0;
+/** 今日番茄数 */
+let tomatoTodayCount = 0;
 /** 工作时间，单位：秒 */
-let workTime = 10;
+let workTime = 2700;
 /** 休息时间，单位：秒 */
-let restTime = 5;
-/** 背景颜色 */
-let background = '#87CEAA';
-
+let restTime = 300;
+/** 主题 */
+let theme = 'default';
+/** 手动/自动模式 */
+let mode = 'manual';
+/** 计时器 */
 let timer = null;
 /** 是否已经开始任务 */
 let isClocking = false;
+/** 是否暂停 */
 let isPause = false;
+let workTipTimer = null;
 
 window.onload = () => {
     initData();
@@ -70,6 +81,10 @@ function clearTimer() {
         timer.stop();
         timer.off();
         timer = null;
+    }
+    if (workTipTimer != null) {
+        clearInterval(workTipTimer);
+        workTipTimer = null;
     }
     isClocking = false;
 }
@@ -84,25 +99,52 @@ function run(type) {
 
     timer = new Timer({
         onstart: () => {
-            view({type: type, start: true});
             if (type === 'work') {
                 ipcRenderer.send('start-work', "开始工作! 倒计时：" + getClockTime(workTime));
             } else if (type === 'rest') {
                 ipcRenderer.send('start-rest', restTime);
             }
+
+            if (workTipTimer != null) {
+                clearInterval(workTipTimer);
+                workTipTimer = null;
+            }
+
+            let workTips = db.read().get('workTips').value();
+            let ranIndex = Math.floor(Math.random() * workTips.length);
+            $(workTipSelector).html(workTips[ranIndex]);
+            workTipTimer = setInterval(() => {
+                $(workTipSelector).hide();
+                ranIndex = (ranIndex + 1) % workTips.length;
+                $(workTipSelector).html(workTips[ranIndex]);
+                $(workTipSelector).fadeIn('slow');
+            }, 10 * 1000);
         },
         ontick: (ms) => $(timerDivSelector).html(getClockTime(Math.round(ms / 1000))),
         onend: () => {
             view({type: type, end: true});
             if (type === 'work') {
-                ipcRenderer.send('work-to-rest');
+                tomatoAllCount++;
+                db.set('tomatoCount.total', tomatoAllCount).write();
+                $(tomatoAllCountSelector).html(tomatoAllCount);
+
+                if (isSameDay()) {
+                    tomatoTodayCount++;
+                    db.set('tomatoCount.today', tomatoTodayCount).write();
+                    db.set('tomatoCount.todayUpdateTime', getNowDate()).write();
+                    $(tomatoTodayCountSelector).html(tomatoTodayCount);
+                }
+
+                ipcRenderer.send('end-work');
             } else if (type === 'rest') {
                 ipcRenderer.send("end-rest", "休息完成!");
             }
+
             clearTimer();
         }
     });
 
+    view({type: type, start: true});
     view({type: 'second'});
     if (type === 'work') {
         startTimer(workTime);
@@ -112,6 +154,24 @@ function run(type) {
 }
 
 function main() {
+    //获取主题目录下的主题
+    let dirs = getDirs(path.join(__dirname, 'css/theme/'));
+    for (let i = 0; i < dirs.length; i++) {
+        let op = document.createElement("option");
+        op.value = dirs[i];
+        op.innerText = dirs[i];
+        $(themeInputSelector).append(op);
+    }
+
+    $(openThemeFileSelector).on('click', () => {
+        console.log(__dirname);
+        if (remote.app.isPackaged) {
+            shell.showItemInFolder(path.join(__dirname + ".unpacked", "css/theme/", theme));
+        } else {
+            shell.showItemInFolder(path.join(__dirname, "css/theme/", theme));
+        }
+    });
+
     $(settingBtnSelector).click((event) => {
         $(settingFrameSelector).fadeToggle("fast");
         event.stopPropagation();
@@ -119,13 +179,12 @@ function main() {
 
     $(settingBtnSelector).mousedown(() => false);
 
-    $(colorInputSelector).keyup(() => $(colorShowSelector).css("background-color", $(colorInputSelector).val()));
-
     $(saveBtnSelector).click(() => {
         updateData({
-            workHours: parseInt($(workInputSelector).val()),
-            restHours: parseInt($(restInputSelector).val()),
-            backgroundColor: $(colorInputSelector).val()
+            workHours: parseInt($(workInputSelector).val()) * 60,
+            restHours: parseInt($(restInputSelector).val()) * 60,
+            themePath: $(themeInputSelector).val(),
+            runMode: $("input[name='mode']:checked").val()
         });
         $(settingBtnSelector).click();
     });
@@ -147,6 +206,10 @@ function main() {
                 }
             }
         }
+        // Ctrl + W
+        if (e.ctrlKey && e.keyCode === 87) {
+            ipcRenderer.send("quit-app");
+        }
     });
 
     $(restBtnSelector).click(() => run('rest'));
@@ -154,6 +217,8 @@ function main() {
     ipcRenderer.on('start-work-main', () => $(workBtnSelector).click());
 
     ipcRenderer.on('start-rest-main', () => $(restBtnSelector).click());
+
+    ipcRenderer.on('pause-work', () => pauseHandler());
 
     $(homeBtnSelector).click(() => {
         if (!isFirstFrame()) {
@@ -172,6 +237,7 @@ function main() {
 
     $(document).on('click', () => {
         $(settingFrameSelector).fadeOut();
+        updateViewData();
     });
 
     $(settingFrameSelector).on('click', (event) => {
@@ -179,17 +245,7 @@ function main() {
     });
 
     $(pauseBtnSelector).click(() => {
-        if (timer != null) {
-            if (isPause) {
-                timer.start();
-                view({type: 'continue'});
-                isPause = false;
-            } else {
-                view({type: 'pause'});
-                timer.pause();
-                isPause = true;
-            }
-        }
+        pauseHandler();
     });
 
     $(taskBtnSelector).click(() => {
@@ -200,6 +256,20 @@ function main() {
             run('rest');
         }
     });
+}
+
+function pauseHandler() {
+    if (timer != null) {
+        if (isPause) {
+            timer.start();
+            view({type: 'continue'});
+            isPause = false;
+        } else {
+            view({type: 'pause'});
+            timer.pause();
+            isPause = true;
+        }
+    }
 }
 
 /**
@@ -224,7 +294,11 @@ function view({type, start, end}) {
             $(pauseBtnSelector).html('暂停');
             if (type === 'work') {
                 $(timerDivSelector).html(getClockTime(workTime));
-                $(pauseBtnSelector).show();
+                if (mode === 'auto') {
+                    $(pauseBtnSelector).hide();
+                } else {
+                    $(pauseBtnSelector).show();
+                }
                 $(taskBtnSelector).html("休息");
                 $(titleDivSelector).html("Working");
             } else if (type === 'rest') {
@@ -248,12 +322,23 @@ function view({type, start, end}) {
     } else if (type === 'continue') {
         $(pauseBtnSelector).html("暂停");
     } else if (type === 'first') {
-        $(firstFrameSelector).show();
-        $(secondFrameSelector).hide();
+        $(secondFrameSelector).fadeOut();
+        $(firstFrameSelector).fadeIn();
     } else if (type === 'second') {
-        $(firstFrameSelector).hide();
-        $(secondFrameSelector).show();
+        $(firstFrameSelector).fadeOut();
+        $(secondFrameSelector).fadeIn();
     }
+}
+
+function getDirs(filePath) {
+    let dirs = [];
+    let files = fs.readdirSync(filePath);
+    for (let i = 0; i < files.length; i++) {
+        if (fs.lstatSync(path.join(filePath, files[i])).isDirectory()) {
+            dirs.push(files[i]);
+        }
+    }
+    return dirs;
 }
 
 /**
@@ -262,28 +347,57 @@ function view({type, start, end}) {
 function initData() {
     workTime = db.get('profile.work').value();
     restTime = db.get('profile.rest').value();
-    background = db.get('profile.background').value();
+    theme = db.get('profile.theme').value();
+    mode = db.get('profile.mode').value();
+    tomatoAllCount = db.get('tomatoCount.total').value();
+
+    tomatoTodayCount = db.get('tomatoCount.today').value();
+    if (!isSameDay()) {
+        tomatoTodayCount = db.set('tomatoCount.today', 0).write();
+        tomatoTodayCount = 0;
+    }
 
     updateViewData();
 }
 
 /**
+ * 是否是同一天
+ */
+function isSameDay() {
+    return getNowDate() ===
+        db.read().get('tomatoCount.todayUpdateTime').value();
+}
+
+function getNowDate() {
+    let now = new Date();
+    let twoNum = function (num) {
+        return num < 10 ? "0" + num : "" + num;
+    };
+    return now.getFullYear() + "-" + twoNum(now.getMonth() + 1) + "-" + twoNum(now.getDate());
+}
+
+/**
  * 更新数据
  */
-function updateData({workHours, restHours, backgroundColor}) {
-    if (workHours != null) {
+function updateData({workHours, restHours, themePath, runMode}) {
+    if (workHours != null && workHours > 0) {
         db.set('profile.work', workHours).write();
         workTime = workHours;
     }
 
-    if (restHours != null) {
+    if (restHours != null && restHours > 0) {
         db.set('profile.rest', restHours).write();
         restTime = restHours;
     }
 
-    if (backgroundColor != null) {
-        db.set('profile.background', backgroundColor).write();
-        background = backgroundColor;
+    if (themePath != null && themePath !== "") {
+        db.set('profile.theme', themePath).write();
+        theme = themePath;
+    }
+
+    if (runMode != null) {
+        db.set('profile.mode', runMode).write();
+        mode = runMode;
     }
 
     updateViewData();
@@ -293,10 +407,16 @@ function updateData({workHours, restHours, backgroundColor}) {
  * 更新视图数据
  */
 function updateViewData() {
-    $('html').css("background-color", background);
-    $(colorShowSelector).css("background-color", background);
-    $(colorInputSelector).val(background);
+    $("#theme").attr("href", "./css/theme/" + theme + "/" + theme + ".css");
+    $(themeInputSelector).val(theme);
+    $(workInputSelector).val(workTime / 60);
+    $(restInputSelector).val(restTime / 60);
+    $(tomatoAllCountSelector).html(tomatoAllCount);
+    $(tomatoTodayCountSelector).html(tomatoTodayCount);
 
-    $(workInputSelector).val(workTime);
-    $(restInputSelector).val(restTime);
+    if (mode === 'manual') {
+        $(manualModeSelector).attr('checked', 'checked');
+    } else if (mode === 'auto') {
+        $(autoModeSelector).attr('checked', 'checked');
+    }
 }

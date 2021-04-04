@@ -10,7 +10,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "pack": "electron-builder --dir",
     "dist": "electron-builder",
-    "package": "electron-packager . 番茄时钟 --win --out ./out --arch=x64 --overwrite --icon=./img/icon.ico"
+    "package": "electron-packager . 番茄时钟 --win --out ./out --arch=x64 --overwrite --icon=./img/icon.ico",
+    "rebuildnew": "npm rebuild --runtime=electron --target=11.0.5 --disturl=https://atom.io/download/atom-shell --abi=85"
   },
   "build": {
     "appId": "com.trent.tomato",
@@ -22,6 +23,7 @@
     "win": {
       "icon": "img/icon.ico",
       "asarUnpack": [
+        "./css/theme",
         "README.md"
       ],
       "target": [
@@ -40,13 +42,28 @@
       "shortcutName": "Tomato"
     }
   },
+  "iohook": {
+    "targets": [
+      "node-83",
+      "electron-85"
+    ],
+    "platforms": [
+      "win32"
+    ],
+    "arches": [
+      "x64",
+      "ia32"
+    ]
+  },
   "postinstall": "electron-builder install-app-deps",
   "devDependencies": {
-    "electron": "^12.0.0",
+    "electron": "^11.0.5",
     "electron-builder": "^22.10.5",
-    "electron-packager": "^15.2.0"
+    "electron-packager": "^15.2.0",
+    "node-abi": "^2.21.0"
   },
   "dependencies": {
+    "iohook": "^0.7.2",
     "jquery": "^3.6.0",
     "lowdb": "^1.0.0",
     "timer.js": "^1.0.4"
