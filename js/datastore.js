@@ -16,34 +16,33 @@ exports.getDb = function (APP) {
     }
 
 
-    function copy(dir, outDir, name) {
+    const copy = function (dir, outDir, name) {
         let file = path.join(dir, name);
         if (fs.statSync(file).isDirectory()) {
             let outFile = path.join(outDir, name);
-            if (name) {
-                if (!fs.existsSync(outFile)) {
-                    fs.mkdirSync(outFile);
-                }
+            if (name && !fs.existsSync(outFile)) {
+                fs.mkdirSync(outFile);
             }
             fs.readdirSync(file).forEach((item) => {
                 copy(file, outFile, item);
             });
         } else {
             let outFile = path.join(outDir, name);
-            let pathForamte = path.parse(outFile);
-            let newFilePath = path.format(pathForamte);
-            fs.writeFileSync(newFilePath, fs.readFileSync(file));
+            if (!fs.existsSync(outFile)) {
+                let pathFormat = path.parse(outFile);
+                let newFilePath = path.format(pathFormat);
+                fs.writeFileSync(newFilePath, fs.readFileSync(file));
+            }
         }
-    }
+    };
 
     let sourceThemeDir;
-    console.log(__dirname);
     if (APP.isPackaged) {
         sourceThemeDir = path.join(__dirname.substr(0, __dirname.indexOf("\\js")) + ".unpacked", "css/theme/");
-        console.log(sourceThemeDir);
     } else {
         sourceThemeDir = "./css/theme/";
     }
+
     copy(sourceThemeDir, targetThemeDir, "");
 
     const confFile = path.join(userDataPath, '/settings.json');

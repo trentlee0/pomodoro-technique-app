@@ -2,7 +2,9 @@
 @media (prefers-color-scheme: light) {
     html {
         content: "light";
-        background-color: #87CE00;
+        --theme-bgColor: #fafafa;
+        --tip-color: #595959;
+        --font-color: #000;
     }
 }
 
@@ -10,8 +12,31 @@
 @media (prefers-color-scheme: dark) {
     html {
         content: "dark";
-        background-color: #87CEAA;
+        --theme-bgColor: #363b40;
+        --tip-color: #99978a;
+        --font-color: #d8d7d3;
     }
+}
+
+html {
+    --green-btn: #1abc9c;
+    --green-btn-hover: #16a085;
+    --red-btn: #e74c3c;
+    --red-btn-hover: #c0392b;
+    --blue-btn: #3498db;
+    --blue-btn-hover: #2980b9;
+    --orange-btn: #e67e22;
+    --orange-btn-hover: #d35400;
+    background-color: var(--theme-bgColor);
+    color: var(--font-color);
+}
+
+.shadow-input {
+    box-shadow: 0 0 1px 1px var(--tip-color);
+}
+
+.transition {
+    transition: 1s;
 }
 
 .btn {
@@ -32,7 +57,6 @@
     position: absolute;
     margin: 8px;
     left: 0;
-    /* background: red; */
     background-image: url('home.png');
     background-size: contain;
     z-index: 4;
@@ -45,7 +69,6 @@
     position: absolute;
     margin: 8px;
     right: 0;
-    /* background: red; */
     background-image: url('setting.png');
     background-size: contain;
     z-index: 4;
@@ -58,13 +81,13 @@
     width: 280px;
     height: 100%;
     right: 0;
-    background: #d9d9d9;
+    background: var(--theme-bgColor);
     z-index: 3;
+    box-shadow: 5px 0 5px 5px var(--tip-color);
     display: none;
 }
 
 .setting-frame ul {
-    /* background: yellow; */
     list-style: none;
     line-height: 50px;
     position: absolute;
@@ -77,8 +100,6 @@
     width: 195px;
     height: 51px;
     font-weight: bold;
-    /* background-color: yellowgreen; */
-    /*padding-right: 10px;*/
     padding-left: 10px;
     border-bottom: 1px solid #595959;
 }
@@ -91,6 +112,8 @@
     margin-left: 8px;
     padding: 2px;
     margin-right: 5px;
+    color: var(--font-color);
+    background: var(--theme-bgColor);
 }
 
 .setting-frame ul li #theme-input {
@@ -100,9 +123,20 @@
 }
 
 .setting-frame ul #theme-show-li #open-theme-file {
-    width: 35px;
+    width: 37px;
     height: 20px;
-    font-size: 11px;
+    vertical-align: middle;
+    font-size: 10px;
+    font-weight: bold;
+    border: 1px solid var(--font-color);
+    outline: none;
+    color: var(--font-color);
+    background: var(--theme-bgColor);
+}
+
+.setting-frame ul #theme-show-li #open-theme-file:hover {
+    background: var(--font-color);
+    color: var(--theme-bgColor);
 }
 
 .setting-frame ul #mode-li .mode-title {
@@ -111,7 +145,6 @@
 
 .setting-frame ul #mode-li .timer-mode {
     font-size: 13px;
-    /* background: yellow; */
 }
 
 .setting-frame ul #mode-li .timer-mode input {
@@ -125,22 +158,22 @@
     bottom: 18px;
     left: 30px;
     width: 80px;
-    background: #1abc9c;
+    background: var(--green-btn);
 }
 
 .setting-frame .save-btn:hover {
-    background: #16a085;
+    background: var(--green-btn-hover);
 }
 
 .setting-frame .cancel-btn {
     bottom: 18px;
     left: 130px;
     width: 80px;
-    background-color: #e74c3c;
+    background-color: var(--red-btn);
 }
 
 .setting-frame .cancel-btn:hover {
-    background: #c0392b;
+    background: var(--red-btn-hover);
 }
 
 .tip {
@@ -152,8 +185,7 @@
     position: absolute;
     left: calc(50% - 250px);
     top: 80px;
-    color: #595959;
-    /*background: #595959;*/
+    color: var(--tip-color);
 }
 
 
@@ -161,25 +193,24 @@
 .first .tip {
     font-size: x-large;
     top: 140px;
-    color: #262626;
 }
 
 .first .work-btn {
-    background: #1abc9c;
+    background: var(--green-btn);
     top: calc(50% - 60px);
 }
 
 .first .work-btn:hover {
-    background: #16a085;
+    background: var(--green-btn-hover);
 }
 
 .first .rest-btn {
-    background: #3498db;
+    background: var(--blue-btn);
     top: calc(50% - 15px);
 }
 
 .first .rest-btn:hover {
-    background: #2980b9;
+    background: var(--blue-btn-hover);
 }
 
 
@@ -191,7 +222,6 @@
 .second .title {
     width: 100px;
     height: 40px;
-    /* background: red; */
     margin: 0 auto;
     text-align: center;
     line-height: 40px;
@@ -205,33 +235,29 @@
 .second .timer {
     width: 300px;
     height: 100px;
-    /* background: blue; */
     text-align: center;
     line-height: 100px;
     position: absolute;
     top: 180px;
     left: calc(50% - 150px);
-    /* line-height: 280px; */
     font-size: 60px;
 }
 
 .second .task-btn {
-    background: #1abc9c;
+    background: var(--green-btn);
     top: 310px;
     display: none;
 }
 
 .second .task-btn:hover {
-    background: #16a085;
+    background: var(--green-btn-hover);
 }
 
 .second .pause-btn {
-    /* background: #3498db; */
-    background: #e67e22;
+    background: var(--orange-btn);
     top: 310px;
 }
 
 .second .pause-btn:hover {
-    /* background: #2980b9; */
-    background: #d35400;
+    background: var(--orange-btn-hover);
 }
