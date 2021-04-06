@@ -9,6 +9,8 @@ const confFile = array['confFile'];
 const icon = "img/icon.ico";
 const trayIcon = "img/icon_tray.ico";
 const trayWorkIcon = "img/icon_tray_work.ico";
+const trayRestIcon = "img/icon_tray_rest.ico";
+const trayPauseIcon = "img/icon_tray_pause.ico";
 
 let win;
 let tray;
@@ -83,8 +85,6 @@ function autoModeHandle() {
             console.log("暂停计时");
             win.webContents.send('pause-work-main');
             isWorkingPaused = true;
-            tray.setImage(path.join(__dirname, trayIcon));
-            tray.setToolTip("番茄时钟");
         }
     }, 500);
 
@@ -136,13 +136,27 @@ function createTray() {
     tray = new Tray(path.join(__dirname, trayIcon));
     const trayMenu = Menu.buildFromTemplate([
         {
-            label: '显示/隐藏窗口',
-            accelerator: db.read().get('profile.showWindowShortcut').value(),
+            label: '显示/隐藏',
             click: () => {
                 if (!isResting) {
                     win.isVisible() ? win.hide() : win.show()
                 }
             }
+        },
+        {
+            label: '关于',
+            click: () => {
+                dialog.showMessageBox({
+                    type: 'info',
+                    title: '关于',
+                    message: 'Tomato\n\nAuthor: Trent0\nGitHub: https://github.com/trentlee0/Electron-Tomato',
+                    buttons: ['OK'],
+                    icon: path.join(__dirname, 'img/logo.png')
+                })
+            }
+        },
+        {
+            type: 'separator'
         },
         {
             label: '开发者模式',
@@ -155,40 +169,54 @@ function createTray() {
             }
         },
         {
-            type: 'checkbox',
-            label: '开机启动',
-            checked: db.read().get('profile.boot').value(),
-            click: function () {
-                let boot = !db.read().get('profile.boot').value();
-                app.setLoginItemSettings({
-                    openAtLogin: boot,
-                    path: process.execPath,
-                    args: [
-                        "--openAsHidden"
-                    ]
-                });
-                db.set('profile.boot', boot).write();
-            }
+            label: '设置',
+            submenu: [
+
+                {
+                    label: '配置文件',
+                    click: () => {
+                        shell.showItemInFolder(confFile);
+                    }
+                },
+                {
+                    type: 'checkbox',
+                    label: '开机启动',
+                    checked: db.read().get('profile.boot').value(),
+                    click: function () {
+                        let boot = !db.read().get('profile.boot').value();
+                        app.setLoginItemSettings({
+                            openAtLogin: boot,
+                            path: process.execPath,
+                            args: [
+                                "--openAsHidden"
+                            ]
+                        });
+                        db.set('profile.boot', boot).write();
+                    }
+                }
+            ]
         },
         {
-            label: '配置文件',
-            click: () => {
-                shell.showItemInFolder(confFile);
-            }
+            label: '开始',
+            submenu: [
+                {
+                    label: '开始工作',
+                    click: () => {
+                        win.webContents.send('start-work-main');
+                        win.show();
+                    }
+                },
+                {
+                    label: '休息一下',
+                    click: () => {
+                        win.webContents.send('start-rest-main');
+                        win.show();
+                    }
+                }
+            ]
         },
         {
-            label: '工作',
-            click: () => {
-                win.webContents.send('start-work-main');
-                win.show();
-            }
-        },
-        {
-            label: '休息',
-            click: () => {
-                win.webContents.send('start-rest-main');
-                win.show();
-            }
+            type: 'separator'
         },
         {
             label: '退出',
@@ -237,8 +265,7 @@ function handler() {
                 isWorking = false;
                 handleResting(isResting);
 
-                tray.setImage(path.join(__dirname, trayIcon));
-                tray.setToolTip("番茄时钟");
+                resetTray();
             } else {
                 event.returnValue = 'no';
             }
@@ -247,6 +274,11 @@ function handler() {
 
 
     /************ 异步 ************/
+
+    ipcMain.on("pause-timer", ((event, type, duration) => {
+        tray.setToolTip('🍷 ' + (type === 'work' ? '工作' : '休息') + '暂停中...... 还剩：' + duration);
+        tray.setImage(path.join(__dirname, trayPauseIcon));
+    }));
 
     ipcMain.on("end-work", ((event, args) => {
         let msg = '已经工作一段时间了，休息一下吧！';
@@ -257,8 +289,7 @@ function handler() {
             timeoutType: "never"
         });
 
-        tray.setImage(path.join(__dirname, trayIcon));
-        tray.setToolTip("番茄时钟");
+        resetTray();
         isWorking = false;
 
         notification.show();
@@ -298,6 +329,7 @@ function handler() {
 
         notification.show();
         win.focus();
+        resetTray();
 
         isResting = false;
         handleResting(isResting);
@@ -316,7 +348,7 @@ function handler() {
         });
 
         tray.setImage(path.join(__dirname, trayWorkIcon));
-        tray.setToolTip("💻 Working...");
+        tray.setToolTip("💻 工作中......");
         isWorking = true;
 
         if (db.read().get('profile.startWorkNotification').value()) {
@@ -329,12 +361,22 @@ function handler() {
     });
 
     ipcMain.on('start-rest', (event, args) => {
-        let rest = parseInt(args);
+        tray.setImage(path.join(__dirname, trayRestIcon));
+        tray.setToolTip("🍹 休息中......");
         isResting = true;
         handleResting(isResting);
     });
 
-    ipcMain.on('hide-app', (event, args) => win.hide());
+    ipcMain.on('hide-app', (event, args) => {
+        if (!isResting) {
+            win.hide()
+        }
+    });
+}
+
+function resetTray() {
+    tray.setImage(path.join(__dirname, trayIcon));
+    tray.setToolTip("番茄时钟");
 }
 
 function handleResting(isResting) {

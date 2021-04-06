@@ -133,7 +133,9 @@ function run(type) {
             }, tipChangeSecond * 1000);
         },
         ontick: (s) => $(timerDiv).html(ReinforceTimer.formatTime((s))),
-        onpause: () => ipcRenderer.send('pause-work'),
+        onpause: () => {
+            ipcRenderer.send('pause-timer', type, ReinforceTimer.formatTime(timer.getDuration()));
+        },
         onend: () => {
             view({type: type, end: true});
             $(workTipDiv).hide();
@@ -192,8 +194,8 @@ function main() {
 
     $(saveBtn).click(() => {
         updateData({
-            workHours: parseInt($(workInput).val()) * 60,
-            restHours: parseInt($(restInput).val()) * 60,
+            workHours: parseFloat($(workInput).val()) * 60,
+            restHours: parseFloat($(restInput).val()) * 60,
             themePath: $(themeInput).val(),
             runMode: $("input[name='mode']:checked").val()
         });
@@ -388,11 +390,13 @@ function getNowDate() {
  */
 function updateData({workHours, restHours, themePath, runMode}) {
     if (workHours != null && workHours > 0) {
+        workHours = Math.floor(workHours);
         db.set('profile.work', workHours).write();
         workTime = workHours;
     }
 
     if (restHours != null && restHours > 0) {
+        restHours = Math.floor(restHours);
         db.set('profile.rest', restHours).write();
         restTime = restHours;
     }
