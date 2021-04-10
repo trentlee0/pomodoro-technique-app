@@ -98,6 +98,14 @@ function run(type) {
     let restTips = db.read().get('restTips').value();
     let tipChangeSecond = 20;
     let workTipTimer = null;
+
+    let clearWorkTipTimer = () => {
+        if (workTipTimer) {
+            clearInterval(workTipTimer);
+            workTipTimer = null;
+        }
+    };
+
     timer = new ReinforceTimer({
         name: type,
         onstart: () => {
@@ -134,6 +142,7 @@ function run(type) {
         },
         ontick: (s) => $(timerDiv).html(ReinforceTimer.formatTime((s))),
         onpause: () => {
+            clearWorkTipTimer();
             ipcRenderer.send('pause-timer', type, ReinforceTimer.formatTime(timer.getDuration()));
         },
         onend: () => {
@@ -160,14 +169,9 @@ function run(type) {
                 ipcRenderer.send("end-rest", "休息完成!");
             }
 
-            timer.stop();
+            clearWorkTipTimer();
         },
-        onstop: () => {
-            if (workTipTimer) {
-                clearInterval(workTipTimer);
-                workTipTimer = null;
-            }
-        }
+        onstop: () => clearWorkTipTimer()
     });
 
     view({type: type, start: true});
@@ -363,6 +367,7 @@ function initData() {
     tomatoTodayCount = db.get('tomatoCount.today').value();
     if (!today()) {
         tomatoTodayCount = db.set('tomatoCount.today', 0).write();
+        db.set('tomatoCount.todayUpdateDate', getNowDate()).write();
         tomatoTodayCount = 0;
     }
 
